@@ -20,8 +20,8 @@ void setup() {
     #define VCOM_LO 0x00  
     #define NUM_IMGS 2
     //Definition of pins
-    #define DISP 4
-    #define SCS 5
+    #define DISP 11
+    #define SCS 10
    
     SPI.setSCK(2);
     SPI.setTX(3);
@@ -29,7 +29,8 @@ void setup() {
 
 
 }
-static char *frmbuff;
+static char *frmBuff;
+static char lineBuff[MLCD_BYTES_LINE+3];
 static int img_num = 0
 extern char vcom = 0x00
 
@@ -88,15 +89,29 @@ void powerOff(){
 }
 
 
-void writeOneLine(){
+void writeBuffer(){
+  digitalWrite(SCS, HIGH);
+  char* locFrmBuff = frmBuff;
+  char* locLineBuff = lineBuff;
+  char lineAddress = 1; 
 
 
-}
-
-
-void writeMultiple(){
-
-
+  *locLineBuff++ = MLCD_WR || vcom;
+  while(lineAddress <= MLCD_YRES){
+    *locLineBuff++ = lineAddress++;
+    for(int i = 0; i < MLCD_BYTES_LINE; ++i){
+      *locLineBuff++ = *locFrmBuff++;
+    }
+    *locLineBuff++ = 0;
+    SPI.beginTransaction(spisettings);
+    SPI.transfer(locFrmBuff, locLineBuff - lineBuff);
+    SPI.endTransaction();
+    locLineBuff = lineBuff;
+  }
+  SPI.beginTransaction(spisettings);
+  SPI.transfer(MLCD_NO, 1);
+  SPI.endTransaction();
+  digitalWrite(SCS, LOW)
 }
 
 
@@ -104,25 +119,25 @@ void toggleVcom(){
   vcom = vcom ^ VCOM_HIGH;
   digitalWrite(SCS, HIGH);
   SPI.beginTransaction(spisettings);
-  SPI.transfer(vcom, sizeof(vcom));
-  SPI.transfer(MLCD_NO, sizeof(MLCD_NO));
+  SPI.transfer(vcom, 1);
+  SPI.transfer(MLCD_NO, 1);
   SPI.endTransaction();
   digitalWrite(SCS, LOW)
 }
 
 
 void checkerPattern(){
-    char* locbuff = frmbuff;
+    char* locBuff = frmBuff;
     for(int i = 0; i < NUM_IMGS * MLCD_YRES * MLCD_BYTES_LINE; ++i){
         bool s1 = i%MLCD_BYTES_LINE < int(MLCD_BYTES_LINE/2);
         bool s2 = i < NUM_IMGS * MLCD_YRES * MLCD_BYTES_LINE;
         bool s3 = int(i/MLCD_BYTES_LINE) < 64;
         bool flag = (s1 ^ s2) ? s3 : !s3;
         if(flag){
-            *locbuff++ = 0xFF;
+            *locBuff++ = 0xFF;
         }
         else{
-            *locbuff++ = 0x00;
+            *locBuff++ = 0x00;
         }
     }
 }
